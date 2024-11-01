@@ -13,19 +13,19 @@ class MlpCausalGraphFractory:
     def generate_causal_graph() -> CausalGraph:
         # Generate causal model parameters
         dropout_rate = (
-            0.4
+            0.6
             * torch.distributions.beta.Beta(
                 *torch.distributions.uniform.Uniform(0.1, 5.0).sample([2])
             )
             .sample()
             .item()
         )
-        n_layers = int(generate_tnlu(1, 6, 2, 3))
-        n_nodes_per_layer = int(generate_tnlu(4, 6, 2, 4))
+        n_layers = int(generate_tnlu(1, 6, 3, 6))
+        n_nodes_per_layer = int(generate_tnlu(4, 6, 3, 7))
         mlp_weights_std = generate_tnlu(
             0.01, 10.0, 0.001, 100, round_output=False
         )
-        nodes_at_first_layer = int(generate_tnlu(1, 6, 1, 4))
+        nodes_at_first_layer = int(generate_tnlu(1, 6, 3, 7))
 
         # Generates nodes list (each element of list
         # is list of nodes in specific layer)
