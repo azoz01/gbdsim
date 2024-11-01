@@ -1,0 +1,5 @@
+TESTS:
+    * generates proper nx representation
+    * generates proper data
+    * all similarity functions
+    * factory??

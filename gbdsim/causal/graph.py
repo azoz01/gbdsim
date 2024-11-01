@@ -49,7 +49,8 @@ class CausalGraph:
         y = (y >= y_pivot).type(torch.int)
         return X, y
 
-    def get_nx_representation(self) -> nx.Graph:
+    @property
+    def nx_graph(self) -> nx.Graph:
         G = nx.DiGraph()
         for node in self.nodes[0]:
             G.add_node(
@@ -58,7 +59,8 @@ class CausalGraph:
                 noise_std=node.noise_std,
             )
         G.add_nodes_from(self.nodes[0])
-        nodes_idx_offset = 0
+        nodes_idx_offset = len(self.nodes[0])
+        last_layer_size = len(self.nodes[0])
         for nodes, weights in zip(self.nodes[1:], self.weights):
             weights = weights.to("cpu")
             for node in nodes:
@@ -70,10 +72,10 @@ class CausalGraph:
             for i, j in product(
                 range(weights.shape[0]), range(weights.shape[1])
             ):
-                G.add_edge(
-                    len(G.nodes()) + j,
-                    len(G.nodes()) - len(nodes) + i,
-                    weight=weights[i, j],
-                )
+                if torch.abs(weights[i, j]) > 1e-10:
+                    u_idx = nodes_idx_offset - last_layer_size + j
+                    v_idx = nodes_idx_offset + i
+                    G.add_edge(u_idx, v_idx, weight=weights[i, j])
             nodes_idx_offset += len(nodes)
+            last_layer_size = len(nodes)
         return G
