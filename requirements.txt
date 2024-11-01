@@ -1,0 +1,4 @@
+networkx==3.4.2
+torch==2.5.0
+
+pre-commit
