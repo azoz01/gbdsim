@@ -18,6 +18,23 @@ class CausalGraph:
         self.weights = weights
 
     def generate_data(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        data = self.generate_causal_matrix()
+        sample_mask = torch.rand(size=[data.shape[0]]).to(DEVICE) <= 0.5
+        if (
+            sample_mask.sum() < 2
+        ):  # edge case when not enough nodes is selected
+            sample_mask[0] = True
+            sample_mask[-1] = True
+        selected_data = data[sample_mask].T
+        selected_data = selected_data[
+            :, torch.randperm(selected_data.shape[1]).to(DEVICE)
+        ]
+        X, y = selected_data[:, :-1], selected_data[:, -1]
+        y_pivot = random.choice(y)
+        y = (y >= y_pivot).type(torch.int)
+        return X, y
+
+    def generate_causal_matrix(self) -> torch.Tensor:
         n_rows = random.randint(100, 10000)
         data = [
             torch.stack(
@@ -34,20 +51,7 @@ class CausalGraph:
                     data[-1][i]
                 ) + node.noise_distribution.sample((n_rows,)).to(DEVICE)
         data = torch.concat(data, dim=0).to(DEVICE)
-        sample_mask = torch.rand(size=[data.shape[0]]).to(DEVICE) <= 0.5
-        if (
-            sample_mask.sum() < 2
-        ):  # edge case when not enough nodes is selected
-            sample_mask[0] = True
-            sample_mask[-1] = True
-        selected_data = data[sample_mask].T
-        selected_data = selected_data[
-            :, torch.randperm(selected_data.shape[1]).to(DEVICE)
-        ]
-        X, y = selected_data[:, :-1], selected_data[:, -1]
-        y_pivot = random.choice(y)
-        y = (y >= y_pivot).type(torch.int)
-        return X, y
+        return data
 
     @property
     def nx_graph(self) -> nx.Graph:
