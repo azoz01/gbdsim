@@ -1,5 +1,9 @@
 networkx==3.4.2
 torch==2.5.0
+torch_geometric==2.6.1
+tensorboardx==2.6.2.2
+tensorboard==2.19.0
+pydantic==2.27.2
 
 pre-commit==4.0.1
 pytest==8.3.3
