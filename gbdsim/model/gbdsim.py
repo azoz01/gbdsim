@@ -3,9 +3,8 @@ from __future__ import annotations
 from itertools import product
 from typing import Tuple
 
-import pytorch_lightning as pl
 import torch.nn.functional as F
-from torch import Tensor, bool, eye, int64
+from torch import Tensor, bool, eye, int64, nn
 from torch_geometric.nn.models import GraphSAGE
 
 from ..utils.constants import DEVICE
@@ -14,7 +13,7 @@ from .config import GbdsimConfig
 from .connectivity import pairwise_mutual_information
 
 
-class GBDSim(pl.LightningModule):
+class GBDSim(nn.Module):
 
     def __init__(
         self,
@@ -35,11 +34,13 @@ class GBDSim(pl.LightningModule):
     def forward(
         self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
     ) -> Tensor:
-        g1 = self.convert_dataset_to_graph(X1, y1)
-        enc1 = self.gnn(*g1).mean(dim=0).unsqueeze(0)
-        g2 = self.convert_dataset_to_graph(X2, y2)
-        enc2 = self.gnn(*g2).mean(dim=0).unsqueeze(0)
+        enc1 = self.calculate_dataset_representation(X1, y1)
+        enc2 = self.calculate_dataset_representation(X2, y2)
         return F.cosine_similarity(enc1, enc2)
+
+    def calculate_dataset_representation(self, X: Tensor, y: Tensor) -> Tensor:
+        g = self.convert_dataset_to_graph(X, y)
+        return self.gnn(*g).mean(dim=0).unsqueeze(0)
 
     def convert_dataset_to_graph(
         self, X: Tensor, y: Tensor
