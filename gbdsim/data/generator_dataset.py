@@ -28,6 +28,7 @@ class GeneratorDataset(IterableDataset):
         def generator():
             for _ in range(length):
                 yield batch_generation_fn()
+            raise StopIteration()
 
         return generator
 

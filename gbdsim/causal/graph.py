@@ -5,7 +5,6 @@ from typing import Tuple
 import networkx as nx
 import torch
 
-from ..utils.constants import DEVICE
 from .node import CausalNode
 
 
@@ -19,7 +18,7 @@ class CausalGraph:
 
     def generate_data(self) -> Tuple[torch.Tensor, torch.Tensor]:
         data = self.generate_causal_matrix()
-        sample_mask = torch.rand(size=[data.shape[0]]).to(DEVICE) <= 0.5
+        sample_mask = torch.rand(size=[data.shape[0]]) <= 0.5
         if (
             sample_mask.sum() < 2
         ):  # edge case when not enough nodes is selected
@@ -27,7 +26,7 @@ class CausalGraph:
             sample_mask[-1] = True
         selected_data = data[sample_mask].T
         selected_data = selected_data[
-            :, torch.randperm(selected_data.shape[1]).to(DEVICE)
+            :, torch.randperm(selected_data.shape[1])
         ]
         X, y = selected_data[:, :-1], selected_data[:, -1]
         y_pivot = random.choice(y)
@@ -39,7 +38,7 @@ class CausalGraph:
         data = [
             torch.stack(
                 [
-                    node.noise_distribution.sample((n_rows,)).to(DEVICE)
+                    node.noise_distribution.sample((n_rows,))
                     for node in self.nodes[0]
                 ]
             )
@@ -49,8 +48,8 @@ class CausalGraph:
             for i, node in enumerate(nodes):
                 data[-1][i] = node.activation_function(
                     data[-1][i]
-                ) + node.noise_distribution.sample((n_rows,)).to(DEVICE)
-        data = torch.concat(data, dim=0).to(DEVICE)
+                ) + node.noise_distribution.sample((n_rows,))
+        data = torch.concat(data, dim=0)
         return data
 
     @property

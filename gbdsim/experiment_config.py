@@ -6,7 +6,7 @@ from torch import nn
 
 
 class MomentumConfig(BaseModel):
-    col2node_type: Literal["momentum"]
+    type: Literal["momentum"]
     hidden_size: int
     n_hidden: int
     output_size: int
@@ -23,7 +23,7 @@ class MomentumConfig(BaseModel):
 
 
 class Col2NodeConfig(BaseModel):
-    col2node_type: Literal["col2node"]
+    type: Literal["col2node"]
     f_n_hidden: int
     f_hidden_size: int
     g_n_hidden: int
@@ -57,8 +57,25 @@ class GraphSageConfig(BaseModel):
     out_channels: int
 
 
-class GbdsimConfig(BaseModel):
+class GBDSimConfig(BaseModel):
     col2node_config: Col2NodeConfig | MomentumConfig = Field(
-        discriminator="col2node_type"
+        discriminator="type"
     )
     graph_sage_config: GraphSageConfig
+
+
+class DataConfig(BaseModel):
+    train_dataset_size: int
+    train_batch_size: int
+    val_dataset_size: int
+    val_batch_size: int
+
+
+class TrainingConfig(BaseModel):
+    num_epochs: int
+
+
+class ExperimentConfig(BaseModel):
+    model: GBDSimConfig
+    data: DataConfig
+    training: TrainingConfig

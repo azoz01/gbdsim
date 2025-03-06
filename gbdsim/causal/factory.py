@@ -2,7 +2,7 @@ import random
 
 import torch
 
-from ..utils.constants import ACTIVATION_FUNCTIONS, DEVICE
+from ..utils.constants import ACTIVATION_FUNCTIONS
 from ..utils.distributions import generate_tnlu
 from .graph import CausalGraph
 from .node import CausalNode
@@ -38,20 +38,16 @@ class MlpCausalGraphFractory:
 
         # Generate edges weights
         # Rows are target nodes and columns are source nodes
-        weights = (
-            torch.distributions.normal.Normal(0, mlp_weights_std)
-            .sample(
-                [
-                    n_nodes_per_layer,
-                    n_nodes_per_layer * (n_layers - 1) + nodes_at_first_layer,
-                ]
-            )
-            .to(DEVICE)
+        weights = torch.distributions.normal.Normal(0, mlp_weights_std).sample(
+            [
+                n_nodes_per_layer,
+                n_nodes_per_layer * (n_layers - 1) + nodes_at_first_layer,
+            ]
         )
         # Dropout edges
         masked_weights = weights * (
             torch.rand(size=weights.shape) >= dropout_rate
-        ).type(torch.int32).to(DEVICE)
+        ).type(torch.int32)
         # Convert weights to list of weights in specific layer
         # Note that len(edges) == len(nodes) - 1
         final_weights = [masked_weights[:, :nodes_at_first_layer]] + [

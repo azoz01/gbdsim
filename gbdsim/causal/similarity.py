@@ -64,7 +64,7 @@ def calculate_graph_edit_distance(g1: nx.Graph, g2: nx.Graph) -> float:
     return next(gen)
 
 
-def calculate_graph_similarity(g1: nx.Graph, g2: nx.Graph) -> float:
+def calculate_graph_distance(g1: nx.Graph, g2: nx.Graph) -> float:
     sim_unstandardized = calculate_graph_edit_distance(g1, g2)
     g1_del_cost = sum(node_del_cost(g1.nodes()[n]) for n in g1.nodes()) + sum(
         edge_del_cost(g1.edges()[n]) for n in g1.edges()
@@ -74,4 +74,4 @@ def calculate_graph_similarity(g1: nx.Graph, g2: nx.Graph) -> float:
     )
     if g1_del_cost + g2_ins_cost == 0:
         return 1
-    return 1 - sim_unstandardized / (g1_del_cost + g2_ins_cost)
+    return sim_unstandardized / (g1_del_cost + g2_ins_cost)

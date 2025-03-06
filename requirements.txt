@@ -4,6 +4,8 @@ torch_geometric==2.6.1
 tensorboardx==2.6.2.2
 tensorboard==2.19.0
 pydantic==2.27.2
+loguru==0.7.3
+scikit-learn==1.6.1
 
 pre-commit==4.0.1
 pytest==8.3.3
