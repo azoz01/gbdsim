@@ -10,20 +10,19 @@ from gbdsim.causal.data import (
     generate_synthetic_causal_data_example,
 )
 from gbdsim.causal.similarity import calculate_graph_distance
-from gbdsim.model.gbdsim import GBDSim
 from gbdsim.utils.constants import DEVICE
+from gbdsim.utils.protocols import DatasetDistanceCalculator
 
 
 class MetricLearningResults:
 
     def evaluate_model(
         self,
-        model: GBDSim,
+        model: DatasetDistanceCalculator,
         pairwise_similarity_eval_num_examples: int,
         retrieval_eval_num_examples: int,
         K_for_retrieval_eval: int,
     ):
-        model = model.eval().to(DEVICE)
         final_results = dict()
         self.__evaluate_similarity(
             final_results, model, pairwise_similarity_eval_num_examples
@@ -39,7 +38,7 @@ class MetricLearningResults:
     def __evaluate_similarity(
         self,
         final_results: dict[str, Any],
-        model: GBDSim,
+        model: DatasetDistanceCalculator,
         pairwise_similarity_eval_num_examples: int,
     ):
         pairwise_eval_examples = [
@@ -51,7 +50,7 @@ class MetricLearningResults:
         for X1, y1, X2, y2, label in tqdm(pairwise_eval_examples):
             predictions.append(
                 float(
-                    model(
+                    model.calculate_dataset_distance(
                         X1.to(DEVICE),
                         y1.to(DEVICE),
                         X2.to(DEVICE),
@@ -71,7 +70,7 @@ class MetricLearningResults:
     def __evaluate_retrieval(
         self,
         final_results: dict[str, Any],
-        model: GBDSim,
+        model: DatasetDistanceCalculator,
         retrieval_eval_num_examples: int,
         K_for_retrieval_eval: int,
     ):
@@ -111,7 +110,7 @@ class MetricLearningResults:
                 [
                     (
                         float(
-                            model(
+                            model.calculate_dataset_distance(
                                 retrieval_eval_datasets[i][0].to(DEVICE),
                                 retrieval_eval_datasets[i][1].to(DEVICE),
                                 retrieval_eval_datasets[j][0].to(DEVICE),

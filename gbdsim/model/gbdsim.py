@@ -36,6 +36,11 @@ class GBDSim(pl.LightningModule):
     def forward(
         self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
     ) -> Tensor:
+        return self.calculate_dataset_distance(X1, y1, X2, y2)
+
+    def calculate_dataset_distance(
+        self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
+    ) -> Tensor:
         enc1 = self.calculate_dataset_representation(X1, y1)
         enc2 = self.calculate_dataset_representation(X2, y2)
         return 1 - F.cosine_similarity(enc1, enc2)

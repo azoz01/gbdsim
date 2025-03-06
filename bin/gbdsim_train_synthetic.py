@@ -14,6 +14,7 @@ from gbdsim.data.generator_dataset import GeneratorDataset
 from gbdsim.experiment_config import ExperimentConfig
 from gbdsim.results.metric_learning_results import MetricLearningResults
 from gbdsim.training.metric_learning import GBDSimMetricLearning
+from gbdsim.utils.constants import DEVICE
 
 CONFIG_PATH = Path("config/artificial_data.yaml")
 OUTPUT_DIR = Path(
@@ -70,7 +71,9 @@ def main():
     trainer.fit(model, train_loader, val_loader)
     with open(OUTPUT_DIR / "metrics.json", "w") as f:
         json.dump(
-            MetricLearningResults().evaluate_model(model, 1024, 100, 5),
+            MetricLearningResults().evaluate_model(
+                model.eval().to(DEVICE), 1024, 100, 5
+            ),
             f,
             indent=4,
         )

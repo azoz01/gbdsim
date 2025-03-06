@@ -7,15 +7,16 @@ import torch.nn.functional as F
 from torch import optim
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection
 
-from ..model.gbdsim import GBDSim
+from gbdsim.utils.protocols import DatasetDistanceCalculator
+
 from ..utils.constants import DEVICE
 
 
-class GBDSimMetricLearning(GBDSim):
+class MetricLearner(pl.LightningModule):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, model: DatasetDistanceCalculator, *args, **kwargs):
         pl.LightningModule.__init__(self)
-        GBDSim.__init__(self, *args, **kwargs)
+        self.model = model
         self.example_input_array = (
             torch.tensor(
                 [
@@ -81,8 +82,7 @@ class GBDSimMetricLearning(GBDSim):
         labels = []
         for X1, y1, X2, y2, label in batch:
             predictions.append(
-                GBDSim.forward(
-                    self,
+                self.model.calculate_dataset_distance(
                     X1.to(DEVICE),
                     y1.to(DEVICE),
                     X2.to(DEVICE),
