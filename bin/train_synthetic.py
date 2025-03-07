@@ -13,8 +13,9 @@ from gbdsim.causal.data import generate_synthetic_causal_data_example
 from gbdsim.data.generator_dataset import GeneratorDataset
 from gbdsim.experiment_config import ExperimentConfig
 from gbdsim.results.metric_learning_results import MetricLearningResults
-from gbdsim.training.metric_learning import GBDSimMetricLearning
+from gbdsim.training.metric_learning import MetricLearner
 from gbdsim.utils.constants import DEVICE
+from gbdsim.utils.model_factory import ModelFactory
 
 CONFIG_PATH = Path("config/artificial_data.yaml")
 OUTPUT_DIR = Path(
@@ -59,7 +60,8 @@ def main():
         pin_memory=True,
         worker_init_fn=lambda id: seed_everything(id, verbose=False),  # type: ignore # noqa: E501
     )
-    model = GBDSimMetricLearning.from_config(config.model)
+    model = MetricLearner(ModelFactory.get_model(config.model))
+
     trainer = Trainer(
         max_epochs=config.training.num_epochs,
         default_root_dir=OUTPUT_DIR,
@@ -72,7 +74,7 @@ def main():
     with open(OUTPUT_DIR / "metrics.json", "w") as f:
         json.dump(
             MetricLearningResults().evaluate_model(
-                model.eval().to(DEVICE), 1024, 100, 5
+                model.model.eval().to(DEVICE), 1024, 100, 5  # type: ignore
             ),
             f,
             indent=4,

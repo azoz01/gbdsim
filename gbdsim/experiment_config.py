@@ -58,10 +58,15 @@ class GraphSageConfig(BaseModel):
 
 
 class GBDSimConfig(BaseModel):
+    type: Literal["gbdsim"]
     col2node_config: Col2NodeConfig | MomentumConfig = Field(
         discriminator="type"
     )
     graph_sage_config: GraphSageConfig
+
+
+class Dataset2VecConfig(BaseModel):
+    type: Literal["dataset2vec"]
 
 
 class DataConfig(BaseModel):
@@ -76,6 +81,6 @@ class TrainingConfig(BaseModel):
 
 
 class ExperimentConfig(BaseModel):
-    model: GBDSimConfig
+    model: GBDSimConfig | Dataset2VecConfig = Field(discriminator="type")
     data: DataConfig
     training: TrainingConfig
