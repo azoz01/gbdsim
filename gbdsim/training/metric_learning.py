@@ -42,6 +42,15 @@ class MetricLearner(pl.LightningModule):
             prefix=prefix,
         )
 
+    def forward(
+        self,
+        X1: torch.Tensor,
+        y1: torch.Tensor,
+        X2: torch.Tensor,
+        y2: torch.Tensor,
+    ) -> torch.Tensor:
+        return self.model.calculate_dataset_distance(X1, y1, X2, y2)
+
     def training_step(
         self,
         batch: list[

@@ -1,3 +1,6 @@
+from dataset2vec.config import Dataset2VecConfig as Dataset2VecConfigOriginal
+from torch import nn
+
 from gbdsim.baselines.dataset2vec import Dataset2VecWrapped
 from gbdsim.experiment_config import Dataset2VecConfig, GBDSimConfig
 from gbdsim.model.gbdsim import GBDSim
@@ -11,6 +14,17 @@ class ModelFactory:
         config: Dataset2VecConfig | GBDSimConfig,
     ) -> DatasetDistanceCalculator:
         if isinstance(config, Dataset2VecConfig):
-            return Dataset2VecWrapped()
+            return Dataset2VecWrapped(
+                Dataset2VecConfigOriginal(
+                    activation_cls=nn.LeakyReLU,
+                    f_dense_hidden_size=256,
+                    f_block_repetitions=1,
+                    f_out_size=256,
+                    g_layers_sizes=[256, 512, 256],
+                    h_dense_hidden_size=256,
+                    h_block_repetitions=1,
+                    output_size=128,
+                )
+            )
         else:
             return GBDSim.from_config(config)
