@@ -79,16 +79,18 @@ def main():
         max_epochs=config.training.num_epochs,
         default_root_dir=output_dir,
         callbacks=[
-            EarlyStopping("val/mae", min_delta=1e-3, patience=5, mode="min"),
+            EarlyStopping("val/mae", min_delta=1e-3, patience=10, mode="min"),
             ModelCheckpoint(output_dir),
         ],
+        gradient_clip_algorithm="norm",
+        gradient_clip_val=1.0,
     )
     trainer.fit(model, train_loader, val_loader)
 
     logger.info("Calculating metrics")
     with open(output_dir / "metrics.json", "w") as f:
         json.dump(
-            MetricLearningResults().evaluate_model(  # TODO: restore
+            MetricLearningResults().evaluate_model(
                 model.model.eval().to(DEVICE), 1024, 100, 5  # type: ignore
             ),
             f,

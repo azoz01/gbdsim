@@ -4,8 +4,7 @@ from itertools import product
 from typing import Tuple
 
 import pytorch_lightning as pl
-import torch.nn.functional as F
-from torch import Tensor, bool, empty, eye, int64
+from torch import Tensor, bool, concat, empty, eye, int64, nn
 from torch_geometric.nn.models import GraphSAGE
 
 from ..experiment_config import GBDSimConfig
@@ -30,11 +29,24 @@ class GBDSim(pl.LightningModule):
             hidden_channels=graph_sage_hidden_channels,
             num_layers=graph_sage_num_layers,
             out_channels=graph_sage_out_channels,
+            act=col2node.activation_function,
         ).to(DEVICE)
+        self.similarity_layer = nn.Sequential(
+            nn.Linear(3 * graph_sage_out_channels, 1), nn.Sigmoid()
+        )
         self.save_hyperparameters()
 
     def forward(
         self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
+    ) -> Tensor:
+        return self.calculate_dataset_distance(X1, y1, X2, y2)
+
+    def calculate_dataset_origin_probability(
+        self,
+        X1: Tensor,
+        y1: Tensor,
+        X2: Tensor,
+        y2: Tensor,
     ) -> Tensor:
         return self.calculate_dataset_distance(X1, y1, X2, y2)
 
@@ -43,7 +55,8 @@ class GBDSim(pl.LightningModule):
     ) -> Tensor:
         enc1 = self.calculate_dataset_representation(X1, y1)
         enc2 = self.calculate_dataset_representation(X2, y2)
-        return 1 - F.cosine_similarity(enc1, enc2)
+        concatenated = concat([enc1, enc2, enc1 * enc2], dim=1)
+        return self.similarity_layer(concatenated)
 
     def calculate_dataset_representation(self, X: Tensor, y: Tensor) -> Tensor:
         g = self.convert_dataset_to_graph(X, y)
@@ -75,7 +88,11 @@ class GBDSim(pl.LightningModule):
                 .permute(1, 0)
                 .to(DEVICE)
             )
-        return nodes_features, edge_index, connectivity
+        return (
+            nodes_features,
+            edge_index,
+            connectivity,
+        )
 
     @classmethod
     def from_config(cls, config: GBDSimConfig) -> GBDSim:

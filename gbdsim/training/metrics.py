@@ -19,9 +19,7 @@ class BinaryCrossEntropy(Metric):
     def update(self, preds: torch.Tensor, target: torch.Tensor) -> None:
         if preds.shape != target.shape:
             raise ValueError("preds and target must have the same shape")
-        self.ce_sum += F.binary_cross_entropy(
-            preds, target, reduce=True, reduction="sum"
-        )
+        self.ce_sum += F.binary_cross_entropy(preds, target, reduction="sum")
         self.obs_counter += preds.shape[0]
 
     def compute(self) -> torch.Tensor:

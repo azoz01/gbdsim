@@ -62,7 +62,8 @@ class MetricLearner(pl.LightningModule):
         return loss
 
     def on_train_epoch_end(self) -> None:
-        return self._log_weights()
+        self._log_learning_rate()
+        self._log_weights()
 
     def validation_step(
         self,
@@ -105,6 +106,20 @@ class MetricLearner(pl.LightningModule):
         pl.LightningModule.log_dict(self, metrics, prog_bar=True)
         return F.mse_loss(predictions, labels)
 
+    def _log_learning_rate(self) -> None:
+        optimizer = self.optimizers()
+        if optimizer:
+            for i, param_group in enumerate(optimizer.param_groups):  # type: ignore # noqa: E501
+                group_name = param_group.get("name", f"group_{i}")
+                lr = param_group["lr"]
+                self.log(
+                    f"lr/{group_name}",
+                    lr,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                )
+
     def _log_gradients(self) -> None:
         for name, param in self.named_parameters():
             if param.grad is not None:
@@ -122,5 +137,21 @@ class MetricLearner(pl.LightningModule):
 
     def configure_optimizers(
         self,
-    ) -> optim.Optimizer:
-        return optim.Adam(self.parameters(), lr=1e-4, weight_decay=0.0)
+    ) -> tuple[list[optim.Optimizer], list[dict[str, Any]]]:
+        optimizer = optim.Adam(
+            self.parameters(),
+            lr=1e-4,
+            weight_decay=0.0,
+        )
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, patience=3, threshold_mode="abs"
+        )
+
+        return [optimizer], [
+            {
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "monitor": "val/mae",
+                "frequency": 1,
+            }
+        ]

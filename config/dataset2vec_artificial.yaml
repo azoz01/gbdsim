@@ -1,9 +1,0 @@
-model:
-  type: dataset2vec
-data:
-  train_dataset_size: 1024
-  train_batch_size: 8
-  val_dataset_size: 256
-  val_batch_size: 32
-training:
-  num_epochs: 1000

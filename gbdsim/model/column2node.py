@@ -24,6 +24,9 @@ class Column2NodeLayer(nn.Module):
         self.f = self.__generate_mlp(
             2, f_n_hidden, f_hidden_size, g_hidden_size, activation_function
         )
+        self.skip_connection = nn.Sequential(
+            nn.Linear(g_hidden_size, output_size)
+        )
         self.g = self.__generate_mlp(
             g_hidden_size,
             g_n_hidden,
@@ -53,11 +56,12 @@ class Column2NodeLayer(nn.Module):
         feature_target_pairs = stack(
             [X.reshape(-1), y.repeat(X.shape[1])], dim=1
         )
-        return self.g(
+        f_out = (
             self.f(feature_target_pairs)
             .reshape(X.shape[1], -1, self.g_hidden_size)
             .mean(dim=1)
         )
+        return self.g(f_out) + self.skip_connection(f_out)
 
 
 class MomentumLayer(nn.Module):
