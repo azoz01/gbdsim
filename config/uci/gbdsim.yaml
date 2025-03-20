@@ -2,20 +2,20 @@ model:
   type: gbdsim
   col2node_config:
     type: col2node
-    f_n_hidden: 1
+    f_n_hidden: 2
     f_hidden_size: 1024
     g_n_hidden: 3
-    g_hidden_size: 256
-    output_size: 512
+    g_hidden_size: 512
+    output_size: 1024
     activation_function: LeakyReLU
   graph_sage_config:
-    hidden_channels: 512
+    hidden_channels: 1024
     num_layers: 3
     out_channels: 256
 data:
-  train_dataset_size: 2048
-  train_batch_size: 32
-  val_dataset_size: 512
+  train_dataset_size: 10000
+  train_batch_size: 16
+  val_dataset_size: 1024
   val_batch_size: 64
 training:
   num_epochs: 1000

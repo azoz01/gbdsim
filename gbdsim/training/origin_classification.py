@@ -104,7 +104,9 @@ class OriginClassificationLearner(pl.LightningModule):
         predictions = torch.stack(predictions).flatten()
         labels = torch.Tensor(labels).to(DEVICE)
         metrics(predictions, labels)
-        pl.LightningModule.log_dict(self, metrics, prog_bar=True)
+        pl.LightningModule.log_dict(
+            self, metrics, prog_bar=True, on_epoch=True, on_step=True
+        )
         return F.binary_cross_entropy(predictions, labels, reduction="mean")
 
     def _log_learning_rate(self) -> None:
@@ -139,7 +141,7 @@ class OriginClassificationLearner(pl.LightningModule):
     def configure_optimizers(
         self,
     ) -> tuple[list[optim.Optimizer], list[dict[str, Any]]]:
-        optimizer = optim.Adam(
+        optimizer = optim.RAdam(
             self.parameters(),
             lr=1e-3,
             weight_decay=0.0,

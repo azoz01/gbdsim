@@ -4,8 +4,9 @@ from itertools import product
 from typing import Tuple
 
 import pytorch_lightning as pl
-from torch import Tensor, bool, concat, empty, eye, int64, nn
-from torch_geometric.nn.models import GraphSAGE
+from torch import Tensor, bool, empty, exp, eye, int64, nn, sqrt
+from torch_geometric.nn import Sequential
+from torch_geometric.nn.conv import TransformerConv
 
 from ..experiment_config import GBDSimConfig
 from ..utils.constants import DEVICE
@@ -24,15 +25,33 @@ class GBDSim(pl.LightningModule):
     ):
         super().__init__()
         self.col2node = col2node.to(DEVICE)
-        self.gnn = GraphSAGE(
-            -1,
-            hidden_channels=graph_sage_hidden_channels,
-            num_layers=graph_sage_num_layers,
-            out_channels=graph_sage_out_channels,
-            act=col2node.activation_function,
-        ).to(DEVICE)
+        self.output_dim = graph_sage_out_channels // 2
+        self.representation_layer = nn.Sequential(
+            nn.Linear(graph_sage_out_channels, graph_sage_out_channels // 2),
+            col2node.activation_function,
+        )
+        self.gnn = Sequential(
+            "x, edge_index, edge_features",
+            [
+                (
+                    TransformerConv(
+                        -1, out_channels=graph_sage_out_channels, edge_dim=1
+                    ).to(DEVICE),
+                    "x, edge_index, edge_features -> x",
+                ),
+                col2node.activation_function,
+                (
+                    TransformerConv(
+                        -1, out_channels=graph_sage_out_channels, edge_dim=1
+                    ).to(DEVICE),
+                    "x, edge_index, edge_features -> x",
+                ),
+                col2node.activation_function,
+            ],
+        )
         self.similarity_layer = nn.Sequential(
-            nn.Linear(3 * graph_sage_out_channels, 1), nn.Sigmoid()
+            nn.Linear(3 * graph_sage_out_channels, 1),
+            nn.ReLU(),
         )
         self.save_hyperparameters()
 
@@ -48,19 +67,21 @@ class GBDSim(pl.LightningModule):
         X2: Tensor,
         y2: Tensor,
     ) -> Tensor:
-        return self.calculate_dataset_distance(X1, y1, X2, y2)
+        dist = self.calculate_dataset_distance(X1, y1, X2, y2)
+        return exp(-dist)
 
     def calculate_dataset_distance(
         self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
     ) -> Tensor:
         enc1 = self.calculate_dataset_representation(X1, y1)
         enc2 = self.calculate_dataset_representation(X2, y2)
-        concatenated = concat([enc1, enc2, enc1 * enc2], dim=1)
-        return self.similarity_layer(concatenated)
+        # concatenated = concat([enc1, enc2, enc1 * enc2], dim=1)
+        # return self.similarity_layer(concatenated)
+        return sqrt(((enc1 - enc2) ** 2).sum())
 
     def calculate_dataset_representation(self, X: Tensor, y: Tensor) -> Tensor:
         g = self.convert_dataset_to_graph(X, y)
-        return self.gnn(*g).mean(dim=0).unsqueeze(0)
+        return self.representation_layer(self.gnn(*g).mean(dim=0)).unsqueeze(0)
 
     def convert_dataset_to_graph(
         self, X: Tensor, y: Tensor
@@ -71,6 +92,7 @@ class GBDSim(pl.LightningModule):
         connectivity = connectivity[
             ~eye(connectivity.shape[0], dtype=bool, device=connectivity.device)
         ]
+        connectivity = connectivity.reshape(-1, 1).to(DEVICE)
         if X.shape[1] == 1:
             edge_index = empty(2, 0).type(int64).to(DEVICE)
         else:

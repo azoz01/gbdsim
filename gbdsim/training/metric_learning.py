@@ -103,7 +103,9 @@ class MetricLearner(pl.LightningModule):
         predictions = torch.stack(predictions).flatten()
         labels = torch.stack(labels).to(DEVICE)
         metrics(predictions, labels)
-        pl.LightningModule.log_dict(self, metrics, prog_bar=True)
+        pl.LightningModule.log_dict(
+            self, metrics, prog_bar=True, on_epoch=True, on_step=True
+        )
         return F.mse_loss(predictions, labels)
 
     def _log_learning_rate(self) -> None:
