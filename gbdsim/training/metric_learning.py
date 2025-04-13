@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch import optim
 from torchmetrics import MeanAbsoluteError, MeanSquaredError, MetricCollection
 
+from gbdsim.experiment_config import TrainingConfig
 from gbdsim.utils.protocols import DatasetDistanceCalculator
 
 from ..utils.constants import DEVICE
@@ -14,9 +15,16 @@ from ..utils.constants import DEVICE
 
 class MetricLearner(pl.LightningModule):
 
-    def __init__(self, model: DatasetDistanceCalculator, *args, **kwargs):
+    def __init__(
+        self,
+        model: DatasetDistanceCalculator,
+        training_config: TrainingConfig,
+        *args,
+        **kwargs,
+    ):
         pl.LightningModule.__init__(self)
         self.model = model
+        self.training_config = training_config
         self.example_input_array = (
             torch.tensor(
                 [
@@ -142,8 +150,8 @@ class MetricLearner(pl.LightningModule):
     ) -> tuple[list[optim.Optimizer], list[dict[str, Any]]]:
         optimizer = optim.Adam(
             self.parameters(),
-            lr=1e-4,
-            weight_decay=0.0,
+            lr=self.training_config.learning_rate,
+            weight_decay=self.training_config.weight_decay,
         )
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, patience=3, threshold_mode="abs"

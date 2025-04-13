@@ -74,7 +74,9 @@ def main():
     )
 
     logger.info("Preparing model training")
-    model = MetricLearner(ModelFactory.get_model(config.model))
+    model = MetricLearner(
+        ModelFactory.get_model(config.model), config.training
+    )
     trainer = Trainer(
         max_epochs=config.training.num_epochs,
         default_root_dir=output_dir,

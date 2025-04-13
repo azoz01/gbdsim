@@ -63,6 +63,7 @@ class GBDSimConfig(BaseModel):
         discriminator="type"
     )
     graph_sage_config: GraphSageConfig
+    similarity_head_strategy: Literal["euclidean", "nn"] = "euclidean"
 
 
 class Dataset2VecConfig(BaseModel):
@@ -78,6 +79,8 @@ class DataConfig(BaseModel):
 
 class TrainingConfig(BaseModel):
     num_epochs: int
+    learning_rate: float
+    weight_decay: float
 
 
 class ExperimentConfig(BaseModel):

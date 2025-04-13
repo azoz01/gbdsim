@@ -7,3 +7,5 @@ data:
   val_batch_size: 64
 training:
   num_epochs: 1000
+  learning_rate: 0.001
+  weight_decay: 0.0

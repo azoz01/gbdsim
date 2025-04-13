@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-from itertools import product
-from typing import Tuple
+from typing import Literal, Tuple
 
 import pytorch_lightning as pl
-from torch import Tensor, bool, empty, exp, eye, int64, nn, sqrt
-from torch_geometric.nn import Sequential
-from torch_geometric.nn.conv import TransformerConv
+import torch
+from torch import nn
+from torch_geometric.nn.models import GraphSAGE
 
 from ..experiment_config import GBDSimConfig
 from ..utils.constants import DEVICE
+from ..utils.modules import (
+    EuclideanDistance,
+    MultiInputSequential,
+    SimilarityInputProcessor,
+)
 from .column2node import Column2NodeLayer, MomentumLayer
-from .connectivity import pairwise_mutual_information
 
 
 class GBDSim(pl.LightningModule):
@@ -22,99 +25,155 @@ class GBDSim(pl.LightningModule):
         graph_sage_hidden_channels=64,
         graph_sage_num_layers=3,
         graph_sage_out_channels=64,
+        similarity_head_strategy: Literal["euclidean", "nn"] = "euclidean",
     ):
         super().__init__()
         self.col2node = col2node.to(DEVICE)
-        self.output_dim = graph_sage_out_channels // 2
+        self.output_dim = graph_sage_out_channels
         self.representation_layer = nn.Sequential(
-            nn.Linear(graph_sage_out_channels, graph_sage_out_channels // 2),
+            nn.Linear(graph_sage_out_channels, graph_sage_out_channels),
+            col2node.activation_function,
+            nn.Linear(graph_sage_out_channels, graph_sage_out_channels),
+            col2node.activation_function,
+            nn.Linear(graph_sage_out_channels, graph_sage_out_channels),
             col2node.activation_function,
         )
-        self.gnn = Sequential(
-            "x, edge_index, edge_features",
-            [
-                (
-                    TransformerConv(
-                        -1, out_channels=graph_sage_out_channels, edge_dim=1
-                    ).to(DEVICE),
-                    "x, edge_index, edge_features -> x",
-                ),
-                col2node.activation_function,
-                (
-                    TransformerConv(
-                        -1, out_channels=graph_sage_out_channels, edge_dim=1
-                    ).to(DEVICE),
-                    "x, edge_index, edge_features -> x",
-                ),
-                col2node.activation_function,
-            ],
+        self.edge_generation_network = nn.Sequential(
+            nn.Linear(self.col2node.output_size, self.col2node.output_size),
+            nn.LeakyReLU(),
+            nn.Linear(
+                self.col2node.output_size, self.col2node.output_size * 2
+            ),
+            nn.LeakyReLU(),
+            nn.Linear(
+                self.col2node.output_size * 2, self.col2node.output_size * 2
+            ),
+            nn.LeakyReLU(),
+            nn.Linear(
+                self.col2node.output_size * 2, self.col2node.output_size
+            ),
+            nn.LeakyReLU(),
         )
-        self.similarity_layer = nn.Sequential(
-            nn.Linear(3 * graph_sage_out_channels, 1),
-            nn.ReLU(),
+        self.edge_classification_network = nn.Sequential(
+            nn.Linear(
+                self.col2node.output_size, self.col2node.output_size * 2
+            ),
+            nn.LeakyReLU(),
+            nn.Linear(
+                self.col2node.output_size * 2, self.col2node.output_size * 2
+            ),
+            nn.LeakyReLU(),
+            nn.Linear(
+                self.col2node.output_size * 2, self.col2node.output_size * 2
+            ),
+            nn.LeakyReLU(),
+            nn.Linear(self.col2node.output_size * 2, 1),
+            nn.Sigmoid(),
         )
+        self.gnn = GraphSAGE(
+            -1,
+            graph_sage_hidden_channels,
+            graph_sage_num_layers,
+            graph_sage_out_channels,
+            0.0,
+            self.col2node.activation_function,
+        )
+
+        if similarity_head_strategy == "euclidean":
+            self.similarity_layer = EuclideanDistance()
+        elif similarity_head_strategy == "nn":
+            self.similarity_layer = MultiInputSequential(
+                SimilarityInputProcessor(),
+                nn.Linear(
+                    3 * graph_sage_out_channels, graph_sage_out_channels
+                ),
+                nn.LeakyReLU(),
+                nn.Linear(graph_sage_out_channels, 1),
+                nn.Sigmoid(),
+            )
+        else:
+            raise ValueError(
+                f"Unknown similarity head strategy: {similarity_head_strategy}"
+            )
         self.save_hyperparameters()
 
     def forward(
-        self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
-    ) -> Tensor:
+        self,
+        X1: torch.Tensor,
+        y1: torch.Tensor,
+        X2: torch.Tensor,
+        y2: torch.Tensor,
+    ) -> torch.Tensor:
         return self.calculate_dataset_distance(X1, y1, X2, y2)
 
     def calculate_dataset_origin_probability(
         self,
-        X1: Tensor,
-        y1: Tensor,
-        X2: Tensor,
-        y2: Tensor,
-    ) -> Tensor:
+        X1: torch.Tensor,
+        y1: torch.Tensor,
+        X2: torch.Tensor,
+        y2: torch.Tensor,
+    ) -> torch.Tensor:
         dist = self.calculate_dataset_distance(X1, y1, X2, y2)
-        return exp(-dist)
+        return torch.exp(-dist)
 
     def calculate_dataset_distance(
-        self, X1: Tensor, y1: Tensor, X2: Tensor, y2: Tensor
-    ) -> Tensor:
+        self,
+        X1: torch.Tensor,
+        y1: torch.Tensor,
+        X2: torch.Tensor,
+        y2: torch.Tensor,
+    ) -> torch.Tensor:
         enc1 = self.calculate_dataset_representation(X1, y1)
         enc2 = self.calculate_dataset_representation(X2, y2)
-        # concatenated = concat([enc1, enc2, enc1 * enc2], dim=1)
-        # return self.similarity_layer(concatenated)
-        return sqrt(((enc1 - enc2) ** 2).sum())
+        return self.similarity_layer(enc1, enc2)
 
-    def calculate_dataset_representation(self, X: Tensor, y: Tensor) -> Tensor:
+    def calculate_dataset_representation(
+        self, X: torch.Tensor, y: torch.Tensor
+    ) -> torch.Tensor:
         g = self.convert_dataset_to_graph(X, y)
         return self.representation_layer(self.gnn(*g).mean(dim=0)).unsqueeze(0)
 
     def convert_dataset_to_graph(
-        self, X: Tensor, y: Tensor
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+        self, X: torch.Tensor, y: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         nodes_features = self.col2node(X, y)
-        mi = pairwise_mutual_information(X)
-        connectivity = mi / mi.sum()
-        connectivity = connectivity[
-            ~eye(connectivity.shape[0], dtype=bool, device=connectivity.device)
-        ]
-        connectivity = connectivity.reshape(-1, 1).to(DEVICE)
-        if X.shape[1] == 1:
-            edge_index = empty(2, 0).type(int64).to(DEVICE)
-        else:
-            edge_index = (
-                Tensor(
-                    [
-                        [i, j]
-                        for i, j in product(
-                            range(X.shape[1]), range(X.shape[1])
-                        )
-                        if i != j
-                    ]
-                )
-                .type(int64)
-                .permute(1, 0)
-                .to(DEVICE)
+        edge_index = (
+            self.__generate_pairs(torch.arange(X.shape[1]))
+            .reshape(-1, 2)
+            .to(DEVICE)
+        )
+        nodes_pairs = self.__generate_pairs(nodes_features)
+        nodes_pairs = nodes_pairs[edge_index[:, 0] != edge_index[:, 1]]
+        edge_relevance = (
+            nn.ReLU()(
+                self.edge_classification_network(nodes_pairs.sum(dim=1)) - 0.5
             )
+            / 0.5
+        )
+        connectivity = (
+            self.edge_generation_network(nodes_pairs.sum(dim=1))
+            * edge_relevance
+        )
+        edge_index = edge_index[edge_index[:, 0] != edge_index[:, 1]].reshape(
+            2, -1
+        )
+
         return (
             nodes_features,
             edge_index,
             connectivity,
         )
+
+    def __generate_pairs(self, t: torch.Tensor) -> torch.Tensor:
+        if len(t.shape) == 1:
+            t = t.unsqueeze(1)
+        return torch.stack(
+            [
+                t.repeat(t.shape[0], 1),
+                torch.repeat_interleave(t, t.shape[0], 0),
+            ],
+            dim=1,
+        ).reshape(t.shape[0] ** 2, 2, -1)
 
     @classmethod
     def from_config(cls, config: GBDSimConfig) -> GBDSim:
@@ -130,4 +189,5 @@ class GBDSim(pl.LightningModule):
             graph_sage_hidden_channels=config.graph_sage_config.hidden_channels,  # noqa: E501
             graph_sage_num_layers=config.graph_sage_config.num_layers,
             graph_sage_out_channels=config.graph_sage_config.out_channels,
+            similarity_head_strategy=config.similarity_head_strategy,
         )

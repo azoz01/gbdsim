@@ -22,7 +22,11 @@ class Column2NodeLayer(nn.Module):
         self.activation_function = activation_function
 
         self.f = self.__generate_mlp(
-            2, f_n_hidden, f_hidden_size, g_hidden_size, activation_function
+            2,
+            f_n_hidden,
+            f_hidden_size,
+            g_hidden_size,
+            activation_function,
         )
         self.skip_connection = nn.Sequential(
             nn.Linear(g_hidden_size, output_size)
@@ -53,8 +57,24 @@ class Column2NodeLayer(nn.Module):
         assert (
             X.shape[0] == y.shape[0]
         ), "Lengths of X and y should be the same"
+        # X_kernel = stack(
+        #     [
+        #         KernelDensity(bandwidth="silverman")
+        #         .fit(col.reshape(-1, 1))
+        #         .score_samples(col.reshape(-1, 1))
+        #         .flatten()
+        #         for col in X.T
+        #     ]
+        # ).T.detach()
+        # X_kernel[X_kernel != X_kernel] = 1.0
         feature_target_pairs = stack(
-            [X.reshape(-1), y.repeat(X.shape[1])], dim=1
+            [
+                X.reshape(-1),
+                # X_kernel.reshape(-1),
+                y.repeat(X.shape[1]),
+                # X_kernel.reshape(-1) * y.repeat(X.shape[1]),
+            ],
+            dim=1,
         )
         f_out = (
             self.f(feature_target_pairs)

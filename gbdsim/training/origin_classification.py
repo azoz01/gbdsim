@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch import optim
 from torchmetrics import Accuracy, MetricCollection
 
+from gbdsim.experiment_config import TrainingConfig
 from gbdsim.utils.protocols import OriginClassifier
 
 from ..utils.constants import DEVICE
@@ -15,9 +16,16 @@ from .metrics import BinaryCrossEntropy
 
 class OriginClassificationLearner(pl.LightningModule):
 
-    def __init__(self, model: OriginClassifier, *args, **kwargs):
+    def __init__(
+        self,
+        model: OriginClassifier,
+        training_config: TrainingConfig,
+        *args,
+        **kwargs,
+    ):
         pl.LightningModule.__init__(self)
         self.model = model
+        self.training_config = training_config
         self.example_input_array = (
             torch.tensor(
                 [
@@ -143,11 +151,11 @@ class OriginClassificationLearner(pl.LightningModule):
     ) -> tuple[list[optim.Optimizer], list[dict[str, Any]]]:
         optimizer = optim.RAdam(
             self.parameters(),
-            lr=1e-3,
-            weight_decay=0.0,
+            lr=self.training_config.learning_rate,
+            weight_decay=self.training_config.weight_decay,
         )
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, patience=3, threshold_mode="abs"
+            optimizer, patience=3, threshold_mode="abs", mode="max"
         )
 
         return [optimizer], [
