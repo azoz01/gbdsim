@@ -17,6 +17,7 @@ class DatasetsPairsGenerator:
         self,
         datasets: list[Tensor],
     ):
+        self.paths: list[Path] = []
         self.data = datasets
         self.n_datasets = len(datasets)
         self.Xs = [dataset[:, :-1] for dataset in datasets]
@@ -30,17 +31,29 @@ class DatasetsPairsGenerator:
             df = pd.read_csv(path)
             X, y = preprocessor.preprocess_pandas_data(df)
             datasets.append(torch.concat([X, y.unsqueeze(1)], dim=1))
-        return DatasetsPairsGenerator(datasets)
+        generator = DatasetsPairsGenerator(datasets)
+        generator.paths = paths
+        return generator
 
     def generate_pair_of_datasets_with_label(
-        self,
+        self, return_datasets_paths: bool = False
     ) -> tuple[Tensor, Tensor, Tensor, Tensor, int]:
-        dataset_1_idx, dataset_2_idx = self.__get_random_datasets_indices()
-        return (
-            *self.__generate_dataset_subsample(dataset_1_idx),
-            *self.__generate_dataset_subsample(dataset_2_idx),
-            int(dataset_1_idx == dataset_2_idx),
-        )
+        if not return_datasets_paths:
+            dataset_1_idx, dataset_2_idx = self.__get_random_datasets_indices()
+            return (
+                *self.__generate_dataset_subsample(dataset_1_idx),
+                *self.__generate_dataset_subsample(dataset_2_idx),
+                int(dataset_1_idx == dataset_2_idx),
+            )
+        else:
+            dataset_1_idx, dataset_2_idx = self.__get_random_datasets_indices()
+            return (  # type: ignore
+                *self.__generate_dataset_subsample(dataset_1_idx),
+                *self.__generate_dataset_subsample(dataset_2_idx),
+                int(dataset_1_idx == dataset_2_idx),
+                self.paths[dataset_1_idx],
+                self.paths[dataset_2_idx],
+            )
 
     def __get_random_datasets_indices(
         self,

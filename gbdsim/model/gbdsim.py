@@ -95,7 +95,6 @@ class GBDSim(pl.LightningModule):
             raise ValueError(
                 f"Unknown similarity head strategy: {similarity_head_strategy}"
             )
-        self.save_hyperparameters()
 
     def forward(
         self,
@@ -114,7 +113,7 @@ class GBDSim(pl.LightningModule):
         y2: torch.Tensor,
     ) -> torch.Tensor:
         dist = self.calculate_dataset_distance(X1, y1, X2, y2)
-        return torch.exp(-dist)
+        return torch.clamp(torch.exp(-dist), 1e-10, 1 - 1e-10)
 
     def calculate_dataset_distance(
         self,

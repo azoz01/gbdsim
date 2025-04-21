@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import pickle as pkl
 import shutil
 from datetime import datetime
@@ -13,7 +12,9 @@ from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.utils.data import DataLoader
 
-from gbdsim.data.data_pairs_generator import DatasetsPairsGenerator
+from gbdsim.causal.data import (
+    generate_synthetic_causal_data_example_classification,
+)
 from gbdsim.data.generator_dataset import GeneratorDataset
 from gbdsim.experiment_config import ExperimentConfig
 from gbdsim.results.origin_classification_results import (
@@ -22,18 +23,16 @@ from gbdsim.results.origin_classification_results import (
 from gbdsim.training.origin_classification import OriginClassificationLearner
 from gbdsim.utils.constants import DEVICE
 from gbdsim.utils.model_factory import ModelFactory
-from gbdsim.utils.modules import EuclideanDistance
 
 
 def main():
     logger.info("Initializing script")
     torch.set_float32_matmul_precision("high")
-    seed_everything(int(os.environ.get("SEED", 123)), workers=True)
+    seed_everything(123)
 
     logger.info("Parsing args")
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-path", type=Path)
-    parser.add_argument("--pretrained-model-path", type=Path, default=None)
     args = parser.parse_args()
 
     logger.info("Parsing config")
@@ -44,24 +43,15 @@ def main():
 
     logger.info("Initializing output directory")
     output_dir = Path(
-        f"results/uci/{config.model.type}/{datetime.now().strftime('%Y_%m_%d__%H_%M_%S')}"  # noqa: E501
+        f"results/synthetic_classification"
+        f"/{config.model.type}/{datetime.now().strftime('%Y_%m_%d__%H_%M_%S')}"  # noqa: E501
     )
     output_dir.mkdir(parents=True, exist_ok=False)
     shutil.copy(args.config_path, output_dir / "config.yaml")
 
     logger.info("Initializing training data")
-    with open("data/uci/meta_split.json", "r") as f:
-        meta_split = json.load(f)
-    train_paths_with_data = list(
-        filter(
-            lambda p: p.stem in meta_split["train"],
-            Path("data/uci/raw").iterdir(),
-        )
-    )
     train_dataset = GeneratorDataset(
-        DatasetsPairsGenerator.from_paths(
-            train_paths_with_data
-        ).generate_pair_of_datasets_with_label,
+        generate_synthetic_causal_data_example_classification,
         config.data.train_dataset_size,
         False,
     )
@@ -69,54 +59,30 @@ def main():
         train_dataset,
         config.data.train_batch_size,
         collate_fn=lambda x: x,
+        num_workers=7,
+        pin_memory=True,
+        worker_init_fn=lambda id: seed_everything(id, verbose=False),  # type: ignore # noqa: E501
     )
 
     logger.info("Initializing validation data")
-    val_paths_with_data = list(
-        filter(
-            lambda p: p.stem in meta_split["val"],
-            Path("data/uci/raw").iterdir(),
-        )
-    )
     val_dataset = GeneratorDataset(
-        DatasetsPairsGenerator.from_paths(
-            val_paths_with_data
-        ).generate_pair_of_datasets_with_label,
+        generate_synthetic_causal_data_example_classification,
         config.data.val_dataset_size,
-        False,
+        True,
     )
     val_loader = DataLoader(
         val_dataset,
         config.data.val_batch_size,
         collate_fn=lambda x: x,
+        num_workers=7,
+        pin_memory=True,
+        worker_init_fn=lambda id: seed_everything(id, verbose=False),  # type: ignore # noqa: E501
     )
 
     logger.info("Preparing model training")
-    if args.pretrained_model_path:
-        logger.info("Loading pretrained model")
-        model = ModelFactory.get_model(config.model)
-        model = OriginClassificationLearner(model, config.training).to(DEVICE)  # type: ignore # noqa E501
-
-        with open(args.pretrained_model_path, "rb") as f:
-            pretrained_model = pkl.load(f).to(DEVICE)
-        model.model.col2node = pretrained_model.model.col2node  # type: ignore
-        model.model.gnn = pretrained_model.model.gnn
-        model.model.similarity_layer = EuclideanDistance()
-        model.model.representation_layer = (
-            pretrained_model.model.representation_layer
-        )
-        model.model.edge_generation_network = (
-            pretrained_model.model.edge_generation_network
-        )
-        model.model.edge_classification_network = (
-            pretrained_model.model.edge_classification_network
-        )
-
-    else:
-        logger.info("Initializing model")
-        model = ModelFactory.get_model(config.model)
-        model = OriginClassificationLearner(model, config.training).to(DEVICE)  # type: ignore # noqa E501
-
+    model = OriginClassificationLearner(
+        ModelFactory.get_model(config.model), config.training  # type: ignore
+    )
     checkpotint_callback = ModelCheckpoint(
         monitor="val/accuracy",
         dirpath=output_dir,
@@ -138,7 +104,7 @@ def main():
     trainer.fit(model, train_loader, val_loader)
     model = OriginClassificationLearner.load_from_checkpoint(
         checkpotint_callback.best_model_path,
-        model=model.model,
+        model=ModelFactory.get_model(config.model),
         training_config=config.training,
     )
 

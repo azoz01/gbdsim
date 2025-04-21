@@ -1,9 +1,11 @@
 from dataset2vec.config import Dataset2VecConfig as Dataset2VecConfigOriginal
 from torch import nn
+from typing_protocol_intersection import ProtocolIntersection as Has
 
 from gbdsim.baselines.dataset2vec import Dataset2VecWrapped
 from gbdsim.experiment_config import Dataset2VecConfig, GBDSimConfig
 from gbdsim.model.gbdsim import GBDSim
+from gbdsim.training.origin_classification import OriginClassificationLearner
 from gbdsim.utils.protocols import DatasetDistanceCalculator
 
 
@@ -12,7 +14,7 @@ class ModelFactory:
     @staticmethod
     def get_model(
         config: Dataset2VecConfig | GBDSimConfig,
-    ) -> DatasetDistanceCalculator:
+    ) -> Has[DatasetDistanceCalculator, OriginClassificationLearner]:
         if isinstance(config, Dataset2VecConfig):
             return Dataset2VecWrapped(
                 Dataset2VecConfigOriginal(

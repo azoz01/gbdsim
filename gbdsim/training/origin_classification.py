@@ -20,8 +20,6 @@ class OriginClassificationLearner(pl.LightningModule):
         self,
         model: OriginClassifier,
         training_config: TrainingConfig,
-        *args,
-        **kwargs,
     ):
         pl.LightningModule.__init__(self)
         self.model = model

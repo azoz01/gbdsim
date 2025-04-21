@@ -1,5 +1,7 @@
 import argparse
 import json
+import os
+import pickle as pkl
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +25,7 @@ from gbdsim.utils.model_factory import ModelFactory
 def main():
     logger.info("Initializing script")
     torch.set_float32_matmul_precision("high")
-    seed_everything(123)
+    seed_everything(int(os.environ.get("SEED", 123)), workers=True)
 
     logger.info("Parsing args")
     parser = argparse.ArgumentParser()
@@ -75,19 +77,34 @@ def main():
 
     logger.info("Preparing model training")
     model = MetricLearner(
-        ModelFactory.get_model(config.model), config.training
+        ModelFactory.get_model(config.model), config.training  # type: ignore
+    )
+    checkpotint_callback = ModelCheckpoint(
+        monitor="val/mae",
+        dirpath=output_dir,
+        filename="best_model",
+        save_top_k=1,
+        mode="min",
     )
     trainer = Trainer(
         max_epochs=config.training.num_epochs,
         default_root_dir=output_dir,
         callbacks=[
             EarlyStopping("val/mae", min_delta=1e-3, patience=10, mode="min"),
-            ModelCheckpoint(output_dir),
+            checkpotint_callback,
         ],
         gradient_clip_algorithm="norm",
         gradient_clip_val=1.0,
     )
     trainer.fit(model, train_loader, val_loader)
+    model = MetricLearner.load_from_checkpoint(
+        checkpotint_callback.best_model_path,
+        model=ModelFactory.get_model(config.model),
+        training_config=config.training,
+    )
+
+    with open(output_dir / "final_model.pkl", "wb") as f:
+        pkl.dump(model, f)
 
     logger.info("Calculating metrics")
     with open(output_dir / "metrics.json", "w") as f:
