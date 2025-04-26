@@ -2,6 +2,8 @@
 
 export PYTHONPATH=`pwd`
 
+python bin/download_tabrepo_datasets.py
+
 for i in 1 3 5 6 7
 do
     echo "Running iteration $i"
