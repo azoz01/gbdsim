@@ -1,0 +1,19 @@
+model:
+  type: gbdsim
+  col2node_config:
+    type: momentum
+    hidden_size: 512
+    n_hidden: 3
+    output_size: 512
+    activation_function: LeakyReLU
+  graph_sage_config:
+    hidden_channels: 256
+    num_layers: 3
+    out_channels: 32
+data:
+  train_dataset_size: 2048
+  train_batch_size: 8
+  val_dataset_size: 1024
+  val_batch_size: 32
+training:
+  num_epochs: 1000

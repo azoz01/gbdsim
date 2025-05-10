@@ -110,6 +110,8 @@ class MetricLearner(pl.LightningModule):
             labels.append(label)
         predictions = torch.stack(predictions).flatten()
         labels = torch.stack(labels).to(DEVICE)
+        print(f"{labels=}")
+        print(f"{predictions=}")
         metrics(predictions, labels)
         pl.LightningModule.log_dict(
             self, metrics, prog_bar=True, on_epoch=True, on_step=True
