@@ -98,6 +98,7 @@ class MetricLearner(pl.LightningModule):
     ) -> torch.Tensor:
         predictions = []
         labels = []
+        embeddings = []
         for X1, y1, X2, y2, label in batch:
             predictions.append(
                 self.model.calculate_dataset_distance(
@@ -107,16 +108,35 @@ class MetricLearner(pl.LightningModule):
                     y2.to(DEVICE),
                 )
             )
+            embeddings.append(
+                self.model.calculate_dataset_representation(
+                    X1.to(DEVICE),
+                    y1.to(DEVICE),
+                )
+            )
+            embeddings.append(
+                self.model.calculate_dataset_representation(
+                    X2.to(DEVICE),
+                    y2.to(DEVICE),
+                )
+            )
             labels.append(label)
         predictions = torch.stack(predictions).flatten()
         labels = torch.stack(labels).to(DEVICE)
-        print(f"{labels=}")
-        print(f"{predictions=}")
         metrics(predictions, labels)
+        embeddings = torch.concat(embeddings)
         pl.LightningModule.log_dict(
             self, metrics, prog_bar=True, on_epoch=True, on_step=True
         )
-        return F.mse_loss(predictions, labels)
+        return (
+            F.mse_loss(predictions, labels)
+            # - 0.0001 * torch.cdist(embeddings, embeddings, p=2).mean()
+            # + 0.01
+            # * torch.abs(
+            #     embeddings @ embeddings.T
+            #     - torch.eye(embeddings.shape[0]).to(embeddings.device)
+            # ).mean()
+        )
 
     def _log_learning_rate(self) -> None:
         optimizer = self.optimizers()

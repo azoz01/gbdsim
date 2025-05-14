@@ -6,6 +6,6 @@ data:
   val_dataset_size: 256
   val_batch_size: 32
 training:
-  num_epochs: 1000
+  num_epochs: 100
   learning_rate: 0.001
   weight_decay: 0.0

@@ -17,7 +17,6 @@ from gbdsim.data.data_pairs_with_landmarkers_distance_generator import (
 from gbdsim.data.generator_dataset import GeneratorDataset
 from gbdsim.experiment_config import ExperimentConfig
 from gbdsim.training.metric_learning import MetricLearner
-from gbdsim.training.origin_classification import OriginClassificationLearner
 from gbdsim.utils.model_factory import ModelFactory
 
 
@@ -94,19 +93,19 @@ def main():
         dirpath=output_dir,
         filename="best_model",
         save_top_k=1,
-        mode="max",
+        mode="min",
     )
     trainer = Trainer(
         max_epochs=config.training.num_epochs,
         default_root_dir=output_dir,
         callbacks=[
-            EarlyStopping("val/mae", min_delta=1e-3, patience=10, mode="max"),
+            EarlyStopping("val/mae", min_delta=1e-6, patience=30, mode="min"),
             checkpotint_callback,
         ],
         log_every_n_steps=1,
     )
     trainer.fit(model, train_loader, val_loader)
-    model = OriginClassificationLearner.load_from_checkpoint(
+    model = MetricLearner.load_from_checkpoint(
         checkpotint_callback.best_model_path,
         model=ModelFactory.get_model(config.model),
         training_config=config.training,

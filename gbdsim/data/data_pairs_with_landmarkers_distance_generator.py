@@ -6,6 +6,7 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
+import torch
 from dataset2vec.utils import DataUtils
 from numpy.typing import NDArray
 from torch import Tensor
@@ -58,7 +59,9 @@ class DatasetsPairsWithLandmarkersGenerator:
     def generate_pair_of_datasets_with_label(
         self,
     ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        dataset_1_idx, dataset_2_idx = self.__get_random_datasets_indices()
+        dataset_1_idx, dataset_2_idx = np.random.choice(
+            self.n_datasets, 2, replace=False
+        ).astype(int)
         if (
             self.datasets[dataset_1_idx][0].shape[0] == 0
             or self.datasets[dataset_2_idx][0].shape[0] == 0
@@ -73,20 +76,8 @@ class DatasetsPairsWithLandmarkersGenerator:
         return (
             *self.__generate_dataset_subsample(dataset_1_idx),
             *self.__generate_dataset_subsample(dataset_2_idx),
-            ((landmarkers_1 - landmarkers_2) ** 2).mean(),
+            torch.sqrt(((landmarkers_1 - landmarkers_2) ** 2).sum()),
         )
-
-    def __get_random_datasets_indices(
-        self,
-    ) -> tuple[int, int]:
-        if np.random.uniform() >= 0.5:
-            idx = np.random.choice(self.n_datasets, 1)[0]
-            return (idx, idx)
-        else:
-            idx1, idx2 = np.random.choice(
-                self.n_datasets, 2, replace=False
-            ).astype(int)
-            return (idx1, idx2)
 
     def __generate_dataset_subsample(
         self, dataset_idx: int
