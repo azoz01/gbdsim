@@ -1,4 +1,6 @@
 import argparse
+import json
+import os
 import pickle as pkl
 import shutil
 from datetime import datetime
@@ -16,14 +18,16 @@ from gbdsim.data.data_pairs_with_landmarkers_distance_generator import (
 )
 from gbdsim.data.generator_dataset import GeneratorDataset
 from gbdsim.experiment_config import ExperimentConfig
+from gbdsim.results.tabrepo_results import TabrepoResults
 from gbdsim.training.metric_learning import MetricLearner
+from gbdsim.utils.constants import DEVICE
 from gbdsim.utils.model_factory import ModelFactory
 
 
 def main():
     logger.info("Initializing script")
     torch.set_float32_matmul_precision("high")
-    seed_everything(123)
+    seed_everything(int(os.environ.get("SEED", 123)), workers=True)
 
     logger.info("Parsing args")
     parser = argparse.ArgumentParser()
@@ -99,7 +103,7 @@ def main():
         max_epochs=config.training.num_epochs,
         default_root_dir=output_dir,
         callbacks=[
-            EarlyStopping("val/mae", min_delta=1e-6, patience=30, mode="min"),
+            EarlyStopping("val/mae", min_delta=1e-6, patience=8, mode="min"),
             checkpotint_callback,
         ],
         log_every_n_steps=1,
@@ -114,23 +118,18 @@ def main():
     with open(output_dir / "final_model.pkl", "wb") as f:
         pkl.dump(model, f)
 
-    # logger.info("Calculating metrics")
-    # results = OriginClassificationResults()
-    # with open(output_dir / "metrics.json", "w") as f:
-    #     json.dump(
-    #         results.evaluate_model(
-    #             model.model.eval().to(DEVICE),  # type: ignore
-    #             val_loader,
-    #             config.data.val_dataset_size // config.data.val_batch_size,
-    #         ),
-    #         f,
-    #         indent=4,
-    #     )
-    # results.visualize_clustering(
-    #     model.model.eval().to(DEVICE),  # type: ignore
-    #     output_dir,
-    # )
-    # logger.info("Finished script")
+    logger.info("Calculating metrics")
+    results = TabrepoResults()
+    with open(output_dir / "metrics.json", "w") as f:
+        json.dump(
+            results.evaluate_model(
+                model.model.eval().to(DEVICE),  # type: ignore
+                val_loader,
+            ),
+            f,
+            indent=4,
+        )
+    logger.info("Finished script")
 
 
 if __name__ == "__main__":

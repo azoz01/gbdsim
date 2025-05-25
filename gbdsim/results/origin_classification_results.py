@@ -1,3 +1,4 @@
+import pickle as pkl
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,11 @@ class OriginClassificationResults:
         representation_data = (
             torch.concat(representations).detach().cpu().numpy()
         )
+        with open(output_path / "representations.pkl", "wb") as f:
+            torch.save(representation_data, f)
+        with open(output_path / "representation_labels.pkl", "wb") as f:
+            pkl.dump(labels, f)
+
         representation_data = TSNE().fit_transform(representation_data)
         fig, ax = plt.subplots()
         sns.scatterplot(

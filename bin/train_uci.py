@@ -106,7 +106,7 @@ def main():
         default_root_dir=output_dir,
         callbacks=[
             EarlyStopping(
-                "val/accuracy", min_delta=1e-3, patience=10, mode="max"
+                "val/accuracy", min_delta=1e-3, patience=5, mode="max"
             ),
             checkpotint_callback,
         ],
