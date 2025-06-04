@@ -26,7 +26,7 @@ class GBDSim(pl.LightningModule):
         graph_sage_num_layers=3,
         graph_sage_out_channels=64,
         similarity_head_strategy: Literal["euclidean", "nn"] = "euclidean",
-        similarity_head_activation: Callable = nn.Sigmoid,  # TODO: restore to sigmoid # noqa: E501
+        similarity_head_activation: Callable = nn.Sigmoid,  # noqa: E501
     ):
         super().__init__()
         self.col2node = col2node.to(DEVICE)
